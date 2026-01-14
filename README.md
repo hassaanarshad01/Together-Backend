@@ -1,4 +1,4 @@
-# 🔐 Together — Backend
+# 💞 Together — Backend
 
 **Together** is a private web application designed for couples to securely store, manage, and grow their shared life in one digital space.
 
