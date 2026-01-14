@@ -1,0 +1,98 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  HIM
+  HER
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  PDF
+}
+
+enum Category {
+  DATES
+  MESSAGES
+  PHOTOS
+  MOMENTS
+  PLANS
+}
+
+model Couple {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  users User[]
+  posts Post[]
+
+  @@map("couples")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  role      UserRole
+  coupleId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  couple Couple @relation(fields: [coupleId], references: [id])
+  posts  Post[] @relation("UserPosts")
+
+  @@unique([coupleId, role])
+  @@index([coupleId])
+  @@map("users")
+}
+
+model Post {
+  id        String    @id @default(uuid())
+  title     String
+  content   String?   @db.Text
+  category  Category
+  eventAt   DateTime? // Optional, meaningful date
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  coupleId    String
+  createdById String
+
+  couple    Couple @relation(fields: [coupleId], references: [id])
+  createdBy User   @relation("UserPosts", fields: [createdById], references: [id], onDelete: Cascade)
+
+  media Media[]
+
+  @@index([category])
+  @@index([createdById])
+  @@index([coupleId])
+  @@index([coupleId, eventAt])
+  @@map("posts")
+}
+
+model Media {
+  id            String    @id @default(uuid())
+  type          MediaType
+  url           String    @db.Text // Store file path or base64
+  name          String
+  size          Int? // File size in bytes
+  mimeType      String? // e.g., "image/jpeg", "video/mp4"
+  mediaPosition Int       @default(0) // For maintaining order of media
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Foreign Keys
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, mediaPosition])
+  @@index([postId])
+  @@index([type])
+  @@map("media")
+}
