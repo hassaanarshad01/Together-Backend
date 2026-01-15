@@ -72,6 +72,11 @@ model User {
   sentInvites     Invitation[] @relation("SentInvites")
   receivedInvites Invitation[] @relation("ReceivedInvites")
 
+  // Nicknames THIS user has created for their partner
+  createdNicknames  Nickname[] @relation("CreatedNicknames")
+  // Nicknames the partner has created FOR this user
+  receivedNicknames Nickname[] @relation("TargetNicknames")
+
   @@unique([coupleId, role])
   @@index([coupleId])
   @@map("users")
@@ -167,4 +172,22 @@ enum InvitationStatus {
   PENDING
   ACCEPTED
   DECLINED
+}
+
+// model for nicknames of couples
+model Nickname {
+  id        String   @id @default(uuid())
+  content   String // e.g., "Pookie", "My Queen"
+  createdAt DateTime @default(now())
+
+  // Who IS being called this nickname?
+  targetUserId String
+  targetUser   User   @relation("TargetNicknames", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  // Who CREATED this nickname?
+  creatorId String
+  creator   User   @relation("CreatedNicknames", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([targetUserId])
+  @@map("nicknames")
 }
