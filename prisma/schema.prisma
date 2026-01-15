@@ -19,30 +19,43 @@ enum MediaType {
   PDF
 }
 
-enum Category {
-  DATES
-  MESSAGES
-  PHOTOS
-  MOMENTS
-  PLANS
+model Category {
+  id        String   @id @default(uuid())
+  name      String
+  isSystem  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  coupleId String
+  couple   Couple @relation(fields: [coupleId], references: [id])
+
+  posts Post[]
+
+  @@unique([coupleId, name])
+  @@index([coupleId])
+  @@map("categories")
 }
 
 model Couple {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
-  users User[]
-  posts Post[]
+  users      User[]
+  posts      Post[]
+  categories Category[]
 
   @@map("couples")
 }
 
 model User {
-  id        String   @id @default(uuid())
-  role      UserRole
-  coupleId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(uuid())
+  email         String    @unique // Required for login and security
+  name          String?   // User's display name
+  password      String?   // Optional to support Google/Social login
+  image         String?   // For profile pictures (e.g., from Google)
+  role          UserRole
+  coupleId      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   couple Couple @relation(fields: [coupleId], references: [id])
   posts  Post[] @relation("UserPosts")
@@ -52,26 +65,52 @@ model User {
   @@map("users")
 }
 
+// Incorprating plans into posts themselves, with levels of priority
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// Comprehensive list of plan types for a couple's life
+enum PlanType {
+  ROMANCE        // Dates, anniversaries, surprises
+  MAINTENANCE    // Bills, chores, car service, house stuff
+  SOCIAL         // Family events, friends' weddings, outings
+  HEALTH         // Doctor appointments, gym sessions
+  FINANCE        // Savings goals, big purchase planning
+  KIDS           // School events, pediatrician, playdates
+  TRAVEL         // Vacations, weekend getaways
+  CAREER         // Important meetings, work trips
+  OTHER
+}
+
 model Post {
   id        String    @id @default(uuid())
   title     String
   content   String?   @db.Text
-  category  Category
-  eventAt   DateTime? // Optional, meaningful date
+  eventAt   DateTime? 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  // PLANNING & ORGANIZATION
+  priority    Priority @default(MEDIUM)
+  planType    PlanType @default(ROMANCE) // New field
+  isCompleted Boolean  @default(false)
+
   coupleId    String
   createdById String
+  categoryId  String
 
-  couple    Couple @relation(fields: [coupleId], references: [id])
-  createdBy User   @relation("UserPosts", fields: [createdById], references: [id], onDelete: Cascade)
+  couple    Couple   @relation(fields: [coupleId], references: [id])
+  createdBy User     @relation("UserPosts", fields: [createdById], references: [id], onDelete: Cascade)
+  category  Category @relation(fields: [categoryId], references: [id])
 
   media Media[]
 
-  @@index([category])
-  @@index([createdById])
-  @@index([coupleId])
+  @@index([createdById]) // adding indexing incase user needs to see their posted-content.
+  @@index([categoryId])
+  @@index([planType]) // Indexed for fast calendar filtering
   @@index([coupleId, eventAt])
   @@map("posts")
 }
@@ -79,15 +118,14 @@ model Post {
 model Media {
   id            String    @id @default(uuid())
   type          MediaType
-  url           String    @db.Text // Store file path or base64
+  url           String    @db.Text
   name          String
-  size          Int? // File size in bytes
-  mimeType      String? // e.g., "image/jpeg", "video/mp4"
-  mediaPosition Int       @default(0) // For maintaining order of media
+  size          Int?
+  mimeType      String?
+  mediaPosition Int       @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // Foreign Keys
   postId String
   post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
 
