@@ -9,8 +9,14 @@ datasource db {
 }
 
 enum UserRole {
-  HIM
-  HER
+  PARTNER_1
+  PARTNER_2
+}
+
+enum CoupleStatus {
+  ACTIVE // Full collaboration
+  SEPARATED // Read-only or private access to past memories
+  SOLO // Partner 1 is alone, partner 2 is gone/removed
 }
 
 enum MediaType {
@@ -26,7 +32,7 @@ model Category {
   createdAt DateTime @default(now())
 
   coupleId String
-  couple   Couple @relation(fields: [coupleId], references: [id])
+  couple   Couple @relation(fields: [coupleId], references: [id], onDelete: Cascade)
 
   posts Post[]
 
@@ -36,8 +42,10 @@ model Category {
 }
 
 model Couple {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
+  id        String       @id @default(uuid())
+  status    CoupleStatus @default(ACTIVE) //incase of couple separations
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
   users      User[]
   posts      Post[]
@@ -47,18 +55,22 @@ model Couple {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique // Required for login and security
-  name          String?   // User's display name
-  password      String?   // Optional to support Google/Social login
-  image         String?   // For profile pictures (e.g., from Google)
-  role          UserRole
-  coupleId      String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id        String    @id @default(uuid())
+  email     String    @unique // Required for login and security
+  name      String? // User's display name
+  password  String? // Optional to support Google/Social login
+  image     String? // For profile pictures (e.g., from Google)
+  role      UserRole?
+  coupleId  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  couple Couple @relation(fields: [coupleId], references: [id])
-  posts  Post[] @relation("UserPosts")
+  couple Couple? @relation(fields: [coupleId], references: [id], onDelete: SetNull)
+  posts  Post[]  @relation("UserPosts")
+
+  // New: Track invites sent by this user
+  sentInvites     Invitation[] @relation("SentInvites")
+  receivedInvites Invitation[] @relation("ReceivedInvites")
 
   @@unique([coupleId, role])
   @@index([coupleId])
@@ -74,14 +86,14 @@ enum Priority {
 
 // Comprehensive list of plan types for a couple's life
 enum PlanType {
-  ROMANCE        // Dates, anniversaries, surprises
-  MAINTENANCE    // Bills, chores, car service, house stuff
-  SOCIAL         // Family events, friends' weddings, outings
-  HEALTH         // Doctor appointments, gym sessions
-  FINANCE        // Savings goals, big purchase planning
-  KIDS           // School events, pediatrician, playdates
-  TRAVEL         // Vacations, weekend getaways
-  CAREER         // Important meetings, work trips
+  ROMANCE // Dates, anniversaries, surprises
+  MAINTENANCE // Bills, chores, car service, house stuff
+  SOCIAL // Family events, friends' weddings, outings
+  HEALTH // Doctor appointments, gym sessions
+  FINANCE // Savings goals, big purchase planning
+  KIDS // School events, pediatrician, playdates
+  TRAVEL // Vacations, weekend getaways
+  CAREER // Important meetings, work trips
   OTHER
 }
 
@@ -89,7 +101,7 @@ model Post {
   id        String    @id @default(uuid())
   title     String
   content   String?   @db.Text
-  eventAt   DateTime? 
+  eventAt   DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -102,7 +114,7 @@ model Post {
   createdById String
   categoryId  String
 
-  couple    Couple   @relation(fields: [coupleId], references: [id])
+  couple    Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   createdBy User     @relation("UserPosts", fields: [createdById], references: [id], onDelete: Cascade)
   category  Category @relation(fields: [categoryId], references: [id])
 
@@ -133,4 +145,26 @@ model Media {
   @@index([postId])
   @@index([type])
   @@map("media")
+}
+
+// New model to handle the "Connect to partner" flow
+model Invitation {
+  id       String @id @default(uuid())
+  senderId String
+  sender   User   @relation("SentInvites", fields: [senderId], references: [id])
+
+  receiverEmail String // The email they typed in the "Connect" box
+  receiverId    String? // Optional: if the partner already has a solo account
+  receiver      User?   @relation("ReceivedInvites", fields: [receiverId], references: [id])
+
+  status    InvitationStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+
+  @@index([receiverEmail])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
 }
